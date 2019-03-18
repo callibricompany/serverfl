@@ -65,5 +65,5 @@ app.post('/checkauth', function(req, res) {
 
 });
 
-app.listen(process.env.PORT, '172.31.23.116');
+app.listen(process.env.PORT, process.env.IP);
 console.log(process.env.PORT + ' Running');
