@@ -1,56 +1,99 @@
 var express = require('express');
-var admin = require('firebase-admin');
 var app = express();
 var bodyParser = require('body-parser');
-require('dotenv').config();
+var { admin , db } =require('./connectFirebase');
+var newToken = require('./refreshToken');
+var createContactZoho = require('./createUser.js');
 
-var serviceAccount = require('./serviceAccountKey.json');
+var accessToken = { access_token: '', expiration_date: ''};
+
+require('dotenv').config();
 
 // parse application/x-www-form-urlencoded
 app.use(bodyParser.urlencoded({ extended: false }))
- 
+
 // parse application/json
 app.use(bodyParser.json())
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-  databaseURL: process.env.DATABASEURL
+// Refreshing Token
+var UpdateAuthToken = function (req, res, next) {
+
+  var dt = new Date();
+  if (accessToken.access_token== '' || accessToken.expiration_date < dt.getTime()) {
+    var promise = new Promise(function(resolve, reject) {
+      resolve(newToken());
+    });
+    
+    promise.then(function(newToken) {
+      var dt = new Date();
+      
+      dt.setSeconds( dt.getSeconds() + newToken.expires_in_sec - 10 )
+              
+      accessToken = { access_token: newToken.access_token, expiration_date: dt.getTime() };
+              
+      next();
+    }).catch(function(error) {
+      console.log(error);
+    });
+  } else {next()};
+}
+
+// Initial Root
+app.get('/', UpdateAuthToken, function(req, res) {
+  
+  console.log(accessToken);
+  res.send('Working...');
+  
 });
 
-app.get('/', function(req, res) {
-  res.send('Cerveau Névralgique Opérationnel !');
-});
-
-// As an admin, the app has access to read and write all data, regardless of Security Rules
-var db = admin.firestore();
-
-  /* var citiesRef = db.collection('users');
-  var allCities = citiesRef.get()
-  .then(snapshot => {
-  snapshot.forEach(doc => {
-  console.log(doc.id, '=>', doc.data());
-  });
-  })
-  .catch(err => {
-  console.log('Error getting documents', err);
-  }); */
-
-app.post("/", function(req,res) {
+// Create a new user
+app.post('/createUser', UpdateAuthToken, function(req, res) {
   
   var idToken = req.body.idToken;
-  
-  console.log(idToken);
-  res.send('Résultat:' + idToken);
-  
-})
+  var UserDetail = {
+    email: req.body.email,
+    lastName : req.body.name, 
+    firstName : req.body.firstname,
+    phone : req.body.phone,
+    description : req.body.company,
+    independant : req.body.independant,
+    company : req.body.company,
+    organization : req.body.organization,
+    supervisor: false,
+    validated: false
+    };
 
+  admin.auth().verifyIdToken(idToken)
+    .then(function(decodedToken) {
+    var uid = decodedToken.uid;
+    
+    // Create contact in Zoho
+    var result_zoho = createContactZoho(UserDetail, accessToken.access_token, uid);
+    
+    }).catch(function(error) {
+      // Handle error
+      console.log(error);
+    });
 
-  // manage connection 
+  res.end('doc inserted');
+  
+});
+
+// Redirect URI
+app.get('/oauth2callback', function(req, res) {
+  
+  console.log(req.query);
+  
+  res.send('OK bobby');
+  
+});
+
+// manage connection 
 app.post('/checkauth', function(req, res) {
 
   var idToken = req.body.idToken;
 
-  console.log('Id Token envoyé :' + idToken)
+  console.log('Id Token envoyé :' + idToken);
   res.send('Id Token envoyé :' + idToken);
 
   admin.auth().verifyIdToken(idToken)
@@ -65,5 +108,6 @@ app.post('/checkauth', function(req, res) {
 
 });
 
-app.listen(process.env.PORT, process.env.IP);
+// Run server
+app.listen(process.env.PORT);
 console.log(process.env.PORT + ' Running');

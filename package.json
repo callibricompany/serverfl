@@ -17,9 +17,13 @@
   },
   "homepage": "https://github.com/callibricompany/adminfl#readme",
   "dependencies": {
+    "axios": "^0.18.0",
     "body-parser": "^1.18.3",
+    "client-oauth2": "^4.2.3",
     "dotenv": "^7.0.0",
     "express": "^4.16.4",
-    "firebase-admin": "^7.0.0"
+    "firebase-admin": "^7.0.0",
+    "querystring": "^0.2.0",
+    "request": "^2.88.0"
   }
 }
